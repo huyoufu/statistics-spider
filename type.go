@@ -20,8 +20,8 @@ type Region struct {
 	t        RegionType
 	Name     string    `json:"name"`
 	Code     string    `json:"code"`
-	Class    string    `json:"class"`
-	Url      string    `json:"url"`
+	Class    string    `json:"class,omitempty"`
+	Url      string    `json:"-"`
 	Children []*Region `json:"children"`
 }
 

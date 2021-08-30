@@ -210,7 +210,7 @@ func getVillages(root *Region) []*Region {
 			}
 
 		})
-		root.add(NewRegion(RegionType_Town, regionName, regionCode, regionClass, regionUrl))
+		root.add(NewRegion(RegionType_Village, regionName, regionCode, regionClass, regionUrl))
 	})
 	return root.Children
 }
