@@ -4,15 +4,19 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/PuerkitoBio/goquery"
+	tt "github.com/huyoufu/go-timetracker"
 	"golang.org/x/text/encoding/simplifiedchinese"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
 	"strings"
+	"time"
 )
 
 func NewDocumentFromURL(url string) *goquery.Document {
+
+	time.Sleep(time.Millisecond * 100)
 	fmt.Printf("正在加载%s\n", url)
 	client := &http.Client{}
 	request, err := http.NewRequest("GET", url, nil)
@@ -31,7 +35,7 @@ func NewDocumentFromURL(url string) *goquery.Document {
 	}
 	defer res.Body.Close()
 	if res.StatusCode != 200 {
-		log.Fatalf("status code error: %d %s", res.StatusCode, res.Status)
+		log.Fatalf("url %s,status code error: %d %s", url, res.StatusCode, res.Status)
 	}
 
 	reader := simplifiedchinese.GBK.NewDecoder().Reader(res.Body)
@@ -42,8 +46,12 @@ func NewDocumentFromURL(url string) *goquery.Document {
 	return doc
 }
 
-func getProvinces(parent string, root *Region) []*Region {
-
+//获取省份
+func getProvinces(root *Region) []*Region {
+	parent := root.Url
+	if parent == "" {
+		return nil
+	}
 	doc := NewDocumentFromURL(parent)
 
 	parent = getRoot(parent)
@@ -56,94 +64,184 @@ func getProvinces(parent string, root *Region) []*Region {
 			provinceUrl, _ := s.Attr("href")
 			provinceUrl = parent + "/" + provinceUrl
 
-			root.add(NewRegion(RegionType_City, provinceName, "", provinceUrl))
+			root.add(NewRegion(RegionType_City, provinceName, "", "", provinceUrl))
 
 		})
 	})
 	return root.Children
 }
-func getCities(parent string, root *Region) []*Region {
-
+func getCities(root *Region) []*Region {
+	parent := root.Url
+	if parent == "" {
+		return nil
+	}
 	doc := NewDocumentFromURL(parent)
 	parent = getRoot(parent)
 	//解析出省份
 	doc.Find(".citytr ").Each(func(i int, s *goquery.Selection) {
 
-		cityName := ""
-		cityCode := ""
-		cityUrl := ""
+		regionName := ""
+		regionCode := ""
+		regionUrl := ""
 
 		s.Find("td a").Each(func(i int, s *goquery.Selection) {
 			if i%2 == 0 {
-				cityCode = s.Text()
+				regionCode = s.Text()
 				//获取省份的连接地址!!
-				cityUrl, _ = s.Attr("href")
-				cityUrl = parent + "/" + cityUrl
+				regionUrl, _ = s.Attr("href")
+				regionUrl = parent + "/" + regionUrl
 			} else {
-				cityName = s.Text()
+				regionName = s.Text()
 			}
 		})
-		root.add(NewRegion(RegionType_City, cityName, cityCode, cityUrl))
+		root.add(NewRegion(RegionType_City, regionName, regionCode, "", regionUrl))
 	})
 	return root.Children
 }
-func getCounty(parent string, root *Region) []*Region {
-
+func getCounty(root *Region) []*Region {
+	parent := root.Url
+	if parent == "" {
+		return nil
+	}
 	doc := NewDocumentFromURL(parent)
 	parent = getRoot(parent)
-	if root.Name == "郑州市" {
-		fmt.Println("~~~~~~~")
-	}
-	//解析出省份
+	//解析县区
 	doc.Find(".countytr ").Each(func(i int, s *goquery.Selection) {
 
-		countyName := ""
-		countyCode := ""
-		countyUrl := ""
+		regionName := ""
+		regionCode := ""
+		regionUrl := ""
 
 		s.Find("td ").Each(func(i int, s *goquery.Selection) {
 			a := s.Find("a")
 			if a.Length() > 0 {
 
 				if i%2 == 0 {
-					countyCode = a.Text()
-					//获取省份的连接地址!!
-					countyUrl, _ = a.Attr("href")
-					countyUrl = parent + "/" + countyUrl
+					regionCode = a.Text()
+					//获取县区的连接地址!!
+					regionUrl, _ = a.Attr("href")
+					regionUrl = parent + "/" + regionUrl
 				} else {
-					countyName = a.Text()
+					regionName = a.Text()
 				}
 			} else {
 				//fmt.Println("没有找到a标签")
 				//为空的话 说明没有下一级了
 				if i%2 == 0 {
-					countyCode = s.Text()
+					regionCode = s.Text()
 				} else {
-					countyName = s.Text()
+					regionName = s.Text()
 				}
 			}
 
 		})
-		root.add(NewRegion(RegionType_County, countyName, countyCode, countyUrl))
+		root.add(NewRegion(RegionType_County, regionName, regionCode, "", regionUrl))
+	})
+	return root.Children
+}
+
+//获取乡镇
+func getTowns(root *Region) []*Region {
+	parent := root.Url
+	if parent == "" {
+		return nil
+	}
+	doc := NewDocumentFromURL(parent)
+	parent = getRoot(parent)
+	//获取乡镇
+	doc.Find(".towntr ").Each(func(i int, s *goquery.Selection) {
+
+		regionName := ""
+		regionCode := ""
+		regionUrl := ""
+
+		s.Find("td ").Each(func(i int, s *goquery.Selection) {
+			a := s.Find("a")
+			if a.Length() > 0 {
+
+				if i%2 == 0 {
+					regionCode = a.Text()
+					//获取乡镇
+					regionUrl, _ = a.Attr("href")
+					regionUrl = parent + "/" + regionUrl
+				} else {
+					regionName = a.Text()
+				}
+			} else {
+				//fmt.Println("没有找到a标签")
+				//为空的话 说明没有下一级了
+				if i%2 == 0 {
+					regionCode = s.Text()
+				} else {
+					regionName = s.Text()
+				}
+			}
+
+		})
+		root.add(NewRegion(RegionType_Town, regionName, regionCode, "", regionUrl))
+	})
+	return root.Children
+}
+
+//获取村委会
+func getVillages(root *Region) []*Region {
+	parent := root.Url
+	if parent == "" {
+		return nil
+	}
+	doc := NewDocumentFromURL(parent)
+	parent = getRoot(parent)
+	//获取乡镇
+	doc.Find(".villagetr ").Each(func(i int, s *goquery.Selection) {
+
+		regionName := ""
+		regionCode := ""
+		regionClass := ""
+		regionUrl := ""
+
+		s.Find("td ").Each(func(i int, s *goquery.Selection) {
+
+			if i%3 == 0 {
+				regionCode = s.Text()
+			} else if i%3 == 1 {
+				regionClass = s.Text()
+			} else {
+				regionName = s.Text()
+			}
+
+		})
+		root.add(NewRegion(RegionType_Town, regionName, regionCode, regionClass, regionUrl))
 	})
 	return root.Children
 }
 
 func main() {
+	tracker := tt.NewTimeTracker("开始下载中国区域信息数据")
 
 	url := "http://www.stats.gov.cn/tjsj/tjbz/tjyqhdmhcxhfdm/2020/index.html"
 
-	root := NewRegion(RegionType_Country, "中国", "", url)
-	provinces := getProvinces(url, root)
+	root := NewRegion(RegionType_Country, "中国", "", "", url)
+	provinces := getProvinces(root)
 
 	//fmt.Println(provinces)
 	//遍历province  获取城市列表
 	for _, province := range provinces {
-		cities := getCities(province.Url, province)
+		cities := getCities(province)
 
 		//获取县
 		for _, city := range cities {
-			getCounty(city.Url, city)
+
+			counties := getCounty(city)
+			//获取乡镇列表
+			for _, county := range counties {
+				towns := getTowns(county)
+
+				//获取村庄列表
+				for _, town := range towns {
+					getVillages(town)
+				}
+
+			}
 		}
 
 	}
@@ -152,7 +250,10 @@ func main() {
 
 	bytes, _ := json.MarshalIndent(root, "", "\t")
 
-	ioutil.WriteFile("data.json", bytes, os.ModePerm)
+	ioutil.WriteFile("data1.json", bytes, os.ModePerm)
+
+	tracker.Close()
+	tracker.PrintBeautiful()
 
 }
 

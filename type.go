@@ -18,18 +18,16 @@ const (
 
 type Region struct {
 	t        RegionType
-	Name     string `json:"name"`
-	Code     string `json:"code"`
-	Url      string `json:"url"`
+	Name     string    `json:"name"`
+	Code     string    `json:"code"`
+	Class    string    `json:"class"`
+	Url      string    `json:"url"`
 	Children []*Region `json:"children"`
 }
 
-func NewRegion(t RegionType, name string, code string, url string) *Region {
-	return &Region{t: t, Name: name, Code: code, Url: url}
+func NewRegion(t RegionType, name string, code string, class string, url string) *Region {
+	return &Region{t: t, Name: name, Code: code, Class: class, Url: url}
 }
-
-
-
 
 func (r *Region) add(region *Region) {
 	r.Children = append(r.Children, region)
