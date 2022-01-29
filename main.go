@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/PuerkitoBio/goquery"
 	tt "github.com/huyoufu/go-timetracker"
-	"golang.org/x/text/encoding/simplifiedchinese"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -19,27 +18,36 @@ func NewDocumentFromURL(url string) *goquery.Document {
 	time.Sleep(time.Millisecond * 100)
 	fmt.Printf("正在加载%s\n", url)
 	client := &http.Client{}
+	client.Timeout = time.Millisecond * 2000
 	request, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		panic(err)
 	}
 	request.Header.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.159 Safari/537.36")
+
 	client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+		fmt.Println("重定向过多!")
 		return http.ErrUseLastResponse
 	}
-	res, err := client.Do(request)
-
-	//res, err := http.Get(url)
-	if err != nil {
-		log.Fatal(err)
+	var res *http.Response
+	for {
+		res, err = client.Do(request)
+		if err != nil {
+			log.Printf("重试吧~~~~~%s", err)
+		} else {
+			break
+		}
 	}
+
 	defer res.Body.Close()
 	if res.StatusCode != 200 {
 		log.Fatalf("url %s,status code error: %d %s", url, res.StatusCode, res.Status)
 	}
 
-	reader := simplifiedchinese.GBK.NewDecoder().Reader(res.Body)
-	doc, err := goquery.NewDocumentFromReader(reader)
+	//reader := simplifiedchinese.GBK.NewDecoder().Reader(res.Body)
+	//doc, err := goquery.NewDocumentFromReader(reader)
+
+	doc, err := goquery.NewDocumentFromReader(res.Body)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -218,7 +226,7 @@ func getVillages(root *Region) []*Region {
 func main() {
 	tracker := tt.NewTimeTracker("开始下载中国区域信息数据")
 
-	url := "http://www.stats.gov.cn/tjsj/tjbz/tjyqhdmhcxhfdm/2020/index.html"
+	url := "http://www.stats.gov.cn/tjsj/tjbz/tjyqhdmhcxhfdm/2021/index.html"
 
 	root := NewRegion(RegionType_Country, "中国", "", "", url)
 	provinces := getProvinces(root)
@@ -227,6 +235,7 @@ func main() {
 	//遍历province  获取城市列表
 	for _, province := range provinces {
 		cities := getCities(province)
+		//getCities(province)
 
 		//获取县
 		for _, city := range cities {
