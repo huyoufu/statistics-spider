@@ -2,7 +2,7 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
+	"errors"
 	"github.com/PuerkitoBio/goquery"
 	tt "github.com/huyoufu/go-timetracker"
 	"io/ioutil"
@@ -15,43 +15,48 @@ import (
 
 func NewDocumentFromURL(url string) *goquery.Document {
 
+	for {
+		document, err := newDocumentFromURL(url)
+		if err != nil {
+			log.Printf("加载%s失败,原因:%s,重试~~~\n", url, err)
+			time.Sleep(time.Millisecond * 2000)
+			continue
+		}
+		return document
+	}
+
+}
+
+func newDocumentFromURL(url string) (*goquery.Document, error) {
 	time.Sleep(time.Millisecond * 100)
-	fmt.Printf("正在加载%s\n", url)
 	client := &http.Client{}
 	client.Timeout = time.Millisecond * 2000
 	request, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	request.Header.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.159 Safari/537.36")
-
 	client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
-		fmt.Println("重定向过多!")
+		log.Println("重定向过多!")
 		return http.ErrUseLastResponse
 	}
 	var res *http.Response
-	for {
-		res, err = client.Do(request)
-		if err != nil {
-			log.Printf("重试吧~~~~~%s", err)
-		} else {
-			break
-		}
+	res, err = client.Do(request)
+	if err != nil {
+		return nil, err
 	}
-
 	defer res.Body.Close()
 	if res.StatusCode != 200 {
-		log.Fatalf("url %s,status code error: %d %s", url, res.StatusCode, res.Status)
+		log.Printf("url %s,status code error: %d %s\n", url, res.StatusCode, res.Status)
+		return nil, errors.New("状态码错误")
 	}
 
 	//reader := simplifiedchinese.GBK.NewDecoder().Reader(res.Body)
 	//doc, err := goquery.NewDocumentFromReader(reader)
 
 	doc, err := goquery.NewDocumentFromReader(res.Body)
-	if err != nil {
-		log.Fatal(err)
-	}
-	return doc
+
+	return doc, err
 }
 
 //获取省份
@@ -60,6 +65,7 @@ func getProvinces(root *Region) []*Region {
 	if parent == "" {
 		return nil
 	}
+	log.Printf("正在加载:%s---对应url:%s", root.Name, parent)
 	doc := NewDocumentFromURL(parent)
 
 	parent = getRoot(parent)
@@ -73,7 +79,6 @@ func getProvinces(root *Region) []*Region {
 			provinceUrl = parent + "/" + provinceUrl
 
 			root.add(NewRegion(RegionType_City, provinceName, "", "", provinceUrl))
-
 		})
 	})
 	return root.Children
@@ -83,6 +88,7 @@ func getCities(root *Region) []*Region {
 	if parent == "" {
 		return nil
 	}
+	log.Printf("正在加载:%s---对应url:%s", root.Name, parent)
 	doc := NewDocumentFromURL(parent)
 	parent = getRoot(parent)
 	//解析出省份
@@ -111,6 +117,7 @@ func getCounty(root *Region) []*Region {
 	if parent == "" {
 		return nil
 	}
+	log.Printf("正在加载:%s---对应url:%s", root.Name, parent)
 	doc := NewDocumentFromURL(parent)
 	parent = getRoot(parent)
 	//解析县区
@@ -154,6 +161,7 @@ func getTowns(root *Region) []*Region {
 	if parent == "" {
 		return nil
 	}
+	log.Printf("正在加载:%s---对应url:%s", root.Name, parent)
 	doc := NewDocumentFromURL(parent)
 	parent = getRoot(parent)
 	//获取乡镇
@@ -197,6 +205,7 @@ func getVillages(root *Region) []*Region {
 	if parent == "" {
 		return nil
 	}
+	log.Printf("正在加载:%s---对应url:  %s", root.Name, parent)
 	doc := NewDocumentFromURL(parent)
 	parent = getRoot(parent)
 	//获取乡镇
