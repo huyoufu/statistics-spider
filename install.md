@@ -5,7 +5,7 @@
 SET CGO_ENABLED=0
 SET GOOS=linux
 SET GOARCH=amd64
-go  build -o ss github.com/huyoufu/statistics-spide
+go  build -o ss github.com/huyoufu/statistics-spider
 ##编译为macosx
 set CGO_ENABLED=0
 set GOOS=darwin

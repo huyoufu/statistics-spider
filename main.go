@@ -13,13 +13,29 @@ import (
 	"time"
 )
 
-func NewDocumentFromURL(url string) *goquery.Document {
+var specialCities = []string{"东莞市", "中山市", "儋州市"}
 
+func isSpecialCity(cityName string) bool {
+	for _, specialCity := range specialCities {
+		if specialCity == cityName {
+			return true
+		}
+	}
+	return false
+}
+
+func NewDocumentFromURL(url string) *goquery.Document {
+	var i time.Duration = 1
 	for {
 		document, err := newDocumentFromURL(url)
 		if err != nil {
-			log.Printf("加载%s失败,原因:%s,重试~~~\n", url, err)
-			time.Sleep(time.Millisecond * 2000)
+			i++
+			log.Printf("第%d次,加载%s失败,原因:%s,重试~~~\n", i, url, err)
+			if i > 16 {
+				i = 1
+			}
+
+			time.Sleep(time.Millisecond * 2000 * i)
 			continue
 		}
 		return document
@@ -28,7 +44,7 @@ func NewDocumentFromURL(url string) *goquery.Document {
 }
 
 func newDocumentFromURL(url string) (*goquery.Document, error) {
-	time.Sleep(time.Millisecond * 100)
+	time.Sleep(time.Millisecond * 50)
 	client := &http.Client{}
 	client.Timeout = time.Millisecond * 2000
 	request, err := http.NewRequest("GET", url, nil)
@@ -78,11 +94,13 @@ func getProvinces(root *Region) []*Region {
 			provinceUrl, _ := s.Attr("href")
 			provinceUrl = parent + "/" + provinceUrl
 
-			root.add(NewRegion(RegionType_City, provinceName, "", "", provinceUrl))
+			root.add(NewRegion(RegionType_Province, provinceName, "", "", provinceUrl))
 		})
 	})
 	return root.Children
 }
+
+//获取城市
 func getCities(root *Region) []*Region {
 	parent := root.Url
 	if parent == "" {
@@ -112,6 +130,8 @@ func getCities(root *Region) []*Region {
 	})
 	return root.Children
 }
+
+//获取县区
 func getCounty(root *Region) []*Region {
 	parent := root.Url
 	if parent == "" {
@@ -238,28 +258,38 @@ func main() {
 	url := "http://www.stats.gov.cn/tjsj/tjbz/tjyqhdmhcxhfdm/2021/index.html"
 
 	root := NewRegion(RegionType_Country, "中国", "", "", url)
+	//获取所有省份
 	provinces := getProvinces(root)
 
-	//fmt.Println(provinces)
 	//遍历province  获取城市列表
 	for _, province := range provinces {
 		cities := getCities(province)
-		//getCities(province)
 
 		//获取县
 		for _, city := range cities {
-
-			counties := getCounty(city)
-			//获取乡镇列表
-			for _, county := range counties {
-				towns := getTowns(county)
+			if isSpecialCity(city.Name) {
+				//如果是特殊城市 直接获取乡镇了
+				towns := getTowns(city)
 
 				//获取村庄列表
 				for _, town := range towns {
 					getVillages(town)
 				}
 
+			} else {
+				//获取县级列表
+				counties := getCounty(city)
+				//获取乡镇列表
+				for _, county := range counties {
+					towns := getTowns(county)
+
+					//获取村庄列表
+					for _, town := range towns {
+						getVillages(town)
+					}
+				}
 			}
+
 		}
 
 	}
@@ -268,7 +298,7 @@ func main() {
 
 	bytes, _ := json.MarshalIndent(root, "", "\t")
 
-	ioutil.WriteFile("data1.json", bytes, os.ModePerm)
+	ioutil.WriteFile("data.json", bytes, os.ModePerm)
 
 	tracker.Close()
 	tracker.PrintBeautiful()

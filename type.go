@@ -20,13 +20,13 @@ type Region struct {
 	Level    RegionType `json:"level"`
 	Name     string     `json:"name"`
 	Code     string     `json:"code"`
-	Class    string     `json:"class,omitempty"`
+	Type     string     `json:"type,omitempty"`
 	Url      string     `json:"-"`
 	Children []*Region  `json:"children"`
 }
 
 func NewRegion(t RegionType, name string, code string, class string, url string) *Region {
-	return &Region{Level: t, Name: name, Code: code, Class: class, Url: url}
+	return &Region{Level: t, Name: name, Code: code, Type: class, Url: url}
 }
 
 func (r *Region) add(region *Region) {
